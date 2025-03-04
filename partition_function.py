@@ -33,24 +33,45 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     num_cells = P.shape[0]
     logP1 = np.log2(P)
     logP0 = np.log2(1 - P)
+
+    # The input file of trees contains on each line a sampling probability corresponding to a tree, 
+    # and the nontrival clades/subtrees of that tree concatenated row-wise to a single line.
+    # The two are separated by a space character
+    # We must reconstruct the subtrees matrix, do to that we need to include the trivial clades/subtrees 
+    # (i.e. the singletons and the subtree containing all leaves), and also a row representing the possibility
+    # that a given mutation is not present in any cell of the tree (row of all zeros)
+    
+    trivial_subtrees = np.concatenate((np.diag(np.ones(num_cells, dtype='bool')), np.ones((1, num_cells), dtype='bool'), np.zeros((1, num_cells), dtype='bool')))
     with open(path_trees, 'r') as file:
         for line in file:
-            # each line contains the sampling probability of the tree and the and that tree's subtrees matrix's rows concatenated, separated by a space
             line = line.strip()
-            split = line.split(" ")
-            log_sampling_prob = np.log2(np.float64(split[0]))
-            subtrees = np.zeros(shape=(2 * num_cells, num_cells), dtype='bool')
-            for idx in range(len(split[1])):
-                subtrees[np.unravel_index(idx, subtrees.shape)] = bool(int(split[1][idx]))
+            split = line.split(" ") # the probability and the subtrees are separated by a space
+            log_sampling_prob = np.log2(np.float64(split[0])) # read the sampling probability
 
+            # Now we read the nontrivial subtrees into a 2d array
+            nontrivial_subtrees = np.zeros(shape=(num_cells - 2, num_cells), dtype='bool')
+            for idx in range(len(split[1])):
+                nontrivial_subtrees[np.unravel_index(idx, nontrivial_subtrees.shape)] = bool(int(split[1][idx]))
+            # We put the nontrivial and trivial subtrees together to form the subtrees array for the given tree
+            subtrees = np.concatenate((nontrivial_subtrees, trivial_subtrees))
+
+            # the denominator is the same for each tree clade/mutation pair with the given sample of trees,
+            # so we only compute this once
             log_p1 = log_prob_mat_mul_calc(logP1, logP0, subtrees)
             denominator += 2 ** Decimal(log_p1 - log_sampling_prob)
 
+            # for each clade/mutation pair to be evaluated, we compute its numerator
             for i in range(len(numerators)):
                 cell_ids = [list(df.index).index(cell) for cell in pairs[i][0]]
                 cells_vec = np.zeros(P.shape[0], dtype='bool')
                 cells_vec[cell_ids] = 1
                 mut_id = list(df.columns).index(pairs[i][1])
+
+                # Below are three different ways of computing p2 (the numerator is the sum of p2 * p1 over all trees)
+                # The first (log_pf_cond_on_one_tree) is a slightly modified version of the way that p2 was computed for the RECOMB submission
+                # The second (log_pf_cond_mat_mul) computes p2 as a ratio between two values computed using
+                #           the function that computes p1 (log_prob_mat_mul_calc)
+                # The third (log_pf_cond_numpy) is a translation of the first into Numpy
 
                 # log_p2 = log_pf_cond_on_one_tree(P, subtrees, cells_vec, mut_id)
                 # log_p2 = log_pf_cond_mat_mul(P, subtrees, cells_vec, mut_id)
@@ -58,9 +79,10 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
 
                 numerators[i] += 2 ** Decimal(log_p1 + log_p2 - log_sampling_prob)
 
+    # output partition function value for each clade,mutation pair, along with the inputted arguments
     print("\t".join(["matrix","trees","fp_rate","fn_rate","clade","mutation","numerator","denominator","p"]))
     for i,numerator in enumerate(numerators):
-        info = map(str, [path_matrix, path_trees, alpha, beta, ",".join(sorted(pairs[i][0])), pairs[i][1], str(numerator), str(denominator), np.float64(numerator / denominator)])
+        info = map(str, [path_matrix, path_trees, alpha, beta, ",".join(sorted(pairs[i][0])), pairs[i][1], numerator, denominator, np.float64(numerator / denominator)])
         print("\t".join(info))
 
 

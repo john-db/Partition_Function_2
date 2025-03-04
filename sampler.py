@@ -40,10 +40,12 @@ def draw_sample_bclt(P, eps=0.1, delta=0.5, coef=2, rng=None):
     """
 
     n_cells = P.shape[0]
-    init_subtrees = np.zeros((2 * n_cells, n_cells), dtype='bool')
-    for i in range(n_cells): # replace this with np.eye(...) to generate 1s on diagonal
-        init_subtrees[i][i] = 1 #initializes singleton clades/subtrees
-    return sample_rec(P.copy(), init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, rng=rng)
+    # We only need the subtree
+    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype='bool')
+    np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
+
+    subtrees, prob, corr = sample_rec(P.copy(), init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, rng=rng)
+    return subtrees[n_cells:-1], prob, corr
 
 def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps=0.1, delta=0.5, coef=2, rng=None):
     
