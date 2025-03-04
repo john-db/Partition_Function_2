@@ -16,13 +16,6 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     P = t1 + t2
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
     
-    logP1 = np.log2(P)
-    logP0 = np.log2(1 - P)
-    
-    numerator = Decimal(0)
-    denominator = Decimal(0)
-
-    
     pairs = None
     if path_scoring_matrix != None:
         scoring_df = pd.read_csv(path_scoring_matrix, sep="\t", index_col=[0])
@@ -36,9 +29,13 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
         pairs = [clade.split(','), mutation]
 
     numerators = np.full(len(pairs), Decimal(0), dtype=object)
+    denominator = Decimal(0)
     num_cells = P.shape[0]
+    logP1 = np.log2(P)
+    logP0 = np.log2(1 - P)
     with open(path_trees, 'r') as file:
         for line in file:
+            # each line contains the sampling probability of the tree and the and that tree's subtrees matrix's rows concatenated, separated by a space
             line = line.strip()
             split = line.split(" ")
             log_sampling_prob = np.log2(np.float64(split[0]))
@@ -61,8 +58,10 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
 
                 numerators[i] += 2 ** Decimal(log_p1 + log_p2 - log_sampling_prob)
 
-    for numerator in numerators:
-        print(np.float64(numerator / denominator))
+    print("\t".join(["matrix","trees","fp_rate","fn_rate","clade","mutation","numerator","denominator","p"]))
+    for i,numerator in enumerate(numerators):
+        info = map(str, [path_matrix, path_trees, alpha, beta, ",".join(sorted(pairs[i][0])), pairs[i][1], str(numerator), str(denominator), np.float64(numerator / denominator)])
+        print("\t".join(info))
 
 
 if __name__ == "__main__":
