@@ -8,8 +8,8 @@ def log_pf_cond_mat_mul(P, subtrees, cells_vec, mut_id):
     if any(np.equal(subtrees, cells_vec).all(1)):
         P_minus_m = np.delete(P, mut_id, axis=1)
         col = P[:, mut_id]
-        res = prob_mat_mul_calc(np.log2(P_minus_m), np.log2(1 - P_minus_m), subtrees)
-        return np.dot(np.log2(col), cells_vec) + np.dot(np.log2(1 - col), 1 - cells_vec) + res - prob_mat_mul_calc(np.log2(P), np.log2(1 - P), subtrees)
+        res = log_prob_mat_mul_calc(np.log2(P_minus_m), np.log2(1 - P_minus_m), subtrees)
+        return np.dot(np.log2(col), cells_vec) + np.dot(np.log2(1 - col), 1 - cells_vec) + res - log_prob_mat_mul_calc(np.log2(P), np.log2(1 - P), subtrees)
     else:
         return np.float64('-inf')
 
@@ -88,63 +88,62 @@ def log_prob_mat_mul_calc(logP1, logP0, subtrees):
     # np.matmul documentation: https://numpy.org/doc/2.1/reference/generated/numpy.matmul.html
     #   "If the first argument is 1-D, it is promoted to a matrix by prepending a 1 to its dimensions.
     #   After matrix multiplication the prepended 1 is removed."
-    res = np.matmul(np.ones(res.shape[0]), np.exp2(res)) # so this line left-multiplies res by a row vector of ones with length equal to the # of subtrees
-                                                         #     this will sum each column of the matrix, resulting in a vector of dimenions # 1 by # of mutations
-    res = np.matmul(np.ones(res.shape[0]), np.log2(res)) # Finally, we want the log of the product of the entries of the resulting vector. To compute this,
-                                                         #     we take the log of the entries of the vector and sum them
+    
+    res = np.exp2(res).sum(axis=0)
+    res = np.log2(res).sum()
 
     # embed()
     # sys.exit()
 
     return res
 
-def main():
-    path_df = "./input_genotype_matrix"
-    path_trees = "./trees"
+# def main():
+#     path_df = "./input_genotype_matrix"
+#     path_trees = "./trees"
 
-    df = pd.read_csv(path_df, sep="\t", index_col=[0])               # read the input genotype matrix in as a dataframe
-    cells_to_indices = {df.index[i]:i for i in range(len(df.index))} # create a dict that maps leaf/cell labels to
-                                                                     #      which index/row they are in the matrix
+#     df = pd.read_csv(path_df, sep="\t", index_col=[0])               # read the input genotype matrix in as a dataframe
+#     cells_to_indices = {df.index[i]:i for i in range(len(df.index))} # create a dict that maps leaf/cell labels to
+#                                                                      #      which index/row they are in the matrix
 
-    alpha=0.001 # False positive rate
-    beta=0.1    # False negative rate
+#     alpha=0.001 # False positive rate
+#     beta=0.1    # False negative rate
 
-    # Here we create the matrix representing the probability distribution of the ground truth,
-    #   i.e. the entry i,j is the probability that entry i,j of the ground truth matrix equals 1,
-    #   given the observed input genotype matrix stored in df
-    I_mtr = df.values # I_mtr is the observed genotype matrix (0 if a mutation was called as absent, 1 if a mutation was present, 3 represents missing data)
-    t1 = I_mtr * (1 - beta) / (alpha + 1 - beta) # If a 1 was observed, then the probability that the ground truth is 1 is equal to (1 - beta) / (alpha + 1 - beta)
-    t2 = (1 - I_mtr) * beta / (beta + 1 - alpha) # If a 0 was observed, then the probability that the ground truth is 1 is equal to beta / (beta + 1 - alpha)
-    P = t1 + t2
-    P[I_mtr == 3] = 0.5 # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
+#     # Here we create the matrix representing the probability distribution of the ground truth,
+#     #   i.e. the entry i,j is the probability that entry i,j of the ground truth matrix equals 1,
+#     #   given the observed input genotype matrix stored in df
+#     I_mtr = df.values # I_mtr is the observed genotype matrix (0 if a mutation was called as absent, 1 if a mutation was present, 3 represents missing data)
+#     t1 = I_mtr * (1 - beta) / (alpha + 1 - beta) # If a 1 was observed, then the probability that the ground truth is 1 is equal to (1 - beta) / (alpha + 1 - beta)
+#     t2 = (1 - I_mtr) * beta / (beta + 1 - alpha) # If a 0 was observed, then the probability that the ground truth is 1 is equal to beta / (beta + 1 - alpha)
+#     P = t1 + t2
+#     P[I_mtr == 3] = 0.5 # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
 
 
-    print(f"Parsing.", end=" ", flush=True)
-    t = time.time()
-    trees_represented_as_subtree_matrices = []
-    with open(path_trees,"r") as file:
-        for line in file:
-            # Each line of the file is a Newick string representing a leaf labelled tree topology
-            # We will convert these strings into numpy arrays representing the subtrees of the tree
-            # As we convert each string to an array, we append it to a list of all the subtree matrices to be scored
-            trees_represented_as_subtree_matrices += [newick_to_subtrees(line, cells_to_indices)]
-    print(f"Got {len(trees_represented_as_subtree_matrices)} trees in {time.time()-t} seonconds")
+#     print(f"Parsing.", end=" ", flush=True)
+#     t = time.time()
+#     trees_represented_as_subtree_matrices = []
+#     with open(path_trees,"r") as file:
+#         for line in file:
+#             # Each line of the file is a Newick string representing a leaf labelled tree topology
+#             # We will convert these strings into numpy arrays representing the subtrees of the tree
+#             # As we convert each string to an array, we append it to a list of all the subtree matrices to be scored
+#             trees_represented_as_subtree_matrices += [newick_to_subtrees(line, cells_to_indices)]
+#     print(f"Got {len(trees_represented_as_subtree_matrices)} trees in {time.time()-t} seonconds")
 
-    logP1 = np.log2(P)      # log2 of the probability matrix. This represents the log of the
-                           #    probability that an entry is 1
-    logP0 = np.log2(1 - P) # log2 of the complement (1 minus) of the probability matrix (). This represents the log of the
-                           #    probability that an entry is 0
+#     logP1 = np.log2(P)      # log2 of the probability matrix. This represents the log of the
+#                            #    probability that an entry is 1
+#     logP0 = np.log2(1 - P) # log2 of the complement (1 minus) of the probability matrix (). This represents the log of the
+#                            #    probability that an entry is 0
 
-    # Create a list of the log probabilities of each tree
-    print(f"Computation.", end=" ", flush=True)
-    consistent_matrix_log_probabilities = np.empty(len(trees_represented_as_subtree_matrices))
-    for i,subtree_matrix in enumerate(trees_represented_as_subtree_matrices):
-            consistent_matrix_log_probabilities[i] = prob_mat_mul_calc(logP1, logP0, subtree_matrix)
-    print(f"Completed in {time.time()-t} seconds")
+#     # Create a list of the log probabilities of each tree
+#     print(f"Computation.", end=" ", flush=True)
+#     consistent_matrix_log_probabilities = np.empty(len(trees_represented_as_subtree_matrices))
+#     for i,subtree_matrix in enumerate(trees_represented_as_subtree_matrices):
+#             consistent_matrix_log_probabilities[i] = prob_mat_mul_calc(logP1, logP0, subtree_matrix)
+#     print(f"Completed in {time.time()-t} seconds")
 
-    # # Prints out the probability values of each tree
-    # for log_prob in consistent_matrix_log_probabilities:
-    #     print(2 ** log_prob)
+#     # # Prints out the probability values of each tree
+#     # for log_prob in consistent_matrix_log_probabilities:
+#     #     print(2 ** log_prob)
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

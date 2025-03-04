@@ -26,7 +26,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     pairs = None
     if path_scoring_matrix != None:
         scoring_df = pd.read_csv(path_scoring_matrix, sep="\t", index_col=[0])
-        pairs = [None] * len(scoring_df.columns)
+        pairs = np.empty(len(scoring_df.columns), dtype=object)
         for i in range(len(scoring_df.columns)):
             col = scoring_df[scoring_df.columns[i]]
             pairs[i] = ([c for c in col.keys() if col[c] == 1], scoring_df.columns[i])
@@ -35,7 +35,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     else:
         pairs = [clade.split(','), mutation]
 
-    numerators = [Decimal(0)] * len(pairs)
+    numerators = np.full(len(pairs), Decimal(0), dtype=object)
     num_cells = P.shape[0]
     with open(path_trees, 'r') as file:
         for line in file:
