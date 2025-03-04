@@ -17,6 +17,10 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
     
     pairs = None
+    # clade,mutation pairs to be used as input for the partition function can be inputted either as:
+    # (1) a matrix that scores the mutations present in the column labels with the clade being the cells (rows) with 1s for that mutation
+    # (2) a text file with clade,mutation pairs (TODO implement this)
+    # (3) a paired argument of clade and mutation for scoring only a single mutation against a single clade
     if path_scoring_matrix != None:
         scoring_df = pd.read_csv(path_scoring_matrix, sep="\t", index_col=[0])
         pairs = np.empty(len(scoring_df.columns), dtype=object)
