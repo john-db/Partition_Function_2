@@ -41,17 +41,19 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     n_cells = P.shape[0]
     # We only need the subtree
     init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype='bool')
+    init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype = P.dtype)))
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    subtrees, prob, corr = sample_rec(P.copy(), init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+    subtrees, prob, corr = sample_rec(init_P, init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prob, corr
 
 def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng=None):
     
-    if P.shape[0] == 1:
+    if len(rows_to_subtrees) == 1:
         return subtrees, np.float64(1), np.float64(1)
     
-    dist = pairwise_distances(P, metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
+    # TODO: implement pairwise_distances so that it does not require P to be copied
+    dist = pairwise_distances(P[rows_to_subtrees], metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
     dist = dist.astype(np.float64) #do we need to cast?
     np.fill_diagonal(dist, np.inf)
 
@@ -76,16 +78,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
 
-    new_row = delta * np.minimum(P[pair[0]], P[pair[1]]) + (1 - delta) * np.maximum(P[pair[0]], P[pair[1]])
-    P = np.delete(P, pair, axis=0)  # remove two rows
-    # P = np.concatenate((P[:np.min(pair)], P[np.min(pair) + 1 :np.max(pair)], P[np.max(pair) + 1:]), axis=0)
-    
-    # P_new = np.append(
-    #     P_new, new_row.reshape(1, -1), axis=0
-    # )
-    P = np.append(
-        P, new_row.reshape(1, -1), axis=0
-    )
+    P[n_cells + iter] = delta * np.minimum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) + (1 - delta) * np.maximum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) #add the new row to the matrix P
 
     subtrees[n_cells + iter] = subtrees[rows_to_subtrees[np.min(pair)]] + subtrees[rows_to_subtrees[np.max(pair)]] #merge the 2 subtrees
     
