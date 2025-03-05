@@ -44,12 +44,12 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype = P.dtype)))
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    subtrees, prob, corr = sample_rec(init_P, init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+    subtrees, prob, corr = sample_rec(init_P, init_subtrees, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prob, corr
 
 def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng=None):
     
-    if len(rows_to_subtrees) == 1:
+    if rows_to_subtrees.size == 1:
         return subtrees, np.float64(1), np.float64(1)
     
     # TODO: implement pairwise_distances so that it does not require P to be copied
@@ -82,7 +82,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
 
     subtrees[n_cells + iter] = subtrees[rows_to_subtrees[np.min(pair)]] + subtrees[rows_to_subtrees[np.max(pair)]] #merge the 2 subtrees
     
-    rows_to_subtrees_copy = [x for x in rows_to_subtrees]
+    rows_to_subtrees_copy = rows_to_subtrees.copy()
 
     for i in range(len(rows_to_subtrees) - 1):
         if i >= np.min(pair):
