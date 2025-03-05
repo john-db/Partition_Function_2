@@ -5,7 +5,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 import argparse
 import pandas as pd
 
-def main(path, num_samples, alpha, beta, seed):
+def main(path, num_samples, alpha, beta, out_path, seed=None):
     df = pd.read_csv(path, sep="\t", index_col=[0])
 
     # Here we create the matrix representing the probability distribution of the ground truth,
@@ -17,22 +17,23 @@ def main(path, num_samples, alpha, beta, seed):
     P = t1 + t2
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
 
-    # print(P.shape[0]) # Print the number of cells so that the subtree matrix can be reconstructed
     rng = np.random.default_rng(seed=seed)
-    for _ in range(num_samples):
-        subtrees, prob_sequence, correction = draw_sample_bclt(P, rng=rng)
-        # Print the probability that the tree was sampled followed by the subtrees
-        print(str(prob_sequence / correction) + " " + "".join(map(lambda x: str(int(x)), subtrees.flatten()))) # There is probably a better way to do this 
-        # Optimizations: The first n rows are always the same (they are the singleton clades) 
-        # and the last two rows are always the same. (2nd to last row is all 1s, last row is all 0s)
-        # So these don't need to be printed
+    try:
+        with open(out_path, "x") as f:
+            for _ in range(num_samples):
+                subtrees, prob_sequence, correction = draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=True, divide_factor=10, rng=rng)
+                # Print the probability that the tree was sampled followed by the (nontrivial) subtrees
+                f.write(str(prob_sequence / correction) + " " + "".join(map(lambda x: str(int(x)), subtrees.flatten())) + "\n") # There is probably a better way to do this 
+    except FileExistsError:
+        print("The path provided for the output file already exists.")
+    
 
-def draw_sample_bclt(P, eps=0.1, delta=0.5, coef=2, rng=None):
+def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
     """
     Parameters:
         P: the matrix of n rows/cells and m mutations/columns with
             P_i,j = Pr[X_i,j = 1]
-            eps, delta, coef: hyperparameters (TODO: describe these)
+            eps, delta, coef, divide/divide_factor: hyperparameters (TODO: describe these)
             rng: Numpy random number generator object
     Returns:
         subtrees: matrix of subtrees representing the sampled BCLT
@@ -44,10 +45,10 @@ def draw_sample_bclt(P, eps=0.1, delta=0.5, coef=2, rng=None):
     init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype='bool')
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    subtrees, prob, corr = sample_rec(P.copy(), init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, rng=rng)
+    subtrees, prob, corr = sample_rec(P.copy(), init_subtrees, n_cells, 0, list(range(n_cells)), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prob, corr
 
-def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps=0.1, delta=0.5, coef=2, rng=None):
+def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng=None):
     
     if P.shape[0] == 1:
         return subtrees, np.float64(1), np.float64(1)
@@ -58,19 +59,24 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps=0.1, delta=0.5,
 
     dist = -dist
     dist = dist - np.max(dist.flat) # normalize
-    dist = -dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
+    if divide:
+        #divide to normalize to max:0 min: -divide_factor
+
+        dabs_max = 0
+        for entry in dist.flat:
+            if entry != float('-inf') and entry != float('inf') and abs(entry) > dabs_max:
+                dabs_max = abs(entry)
+
+        if dabs_max != 0:
+            dist = -dist * (divide_factor / dabs_max)
+        else:
+            dist = -dist
+    else:
+        dist = -dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
 
     prob = softmax(-dist).astype(np.float64) #do we need to cast?
-    
-    ind = None
-    pair = None
-    if rng == None:
-        np.random.seed(seed=None)
-        ind = np.random.choice(len(prob.flat), p=prob.flat)
-        pair = np.unravel_index(ind, prob.shape)
-    else:
-        ind = rng.choice(len(prob.flat), p=prob.flat)
-        pair = np.unravel_index(ind, prob.shape)
+    ind = rng.choice(len(prob.flat), p=prob.flat)
+    pair = np.unravel_index(ind, prob.shape)
 
     new_row = delta * np.minimum(P[pair[0]], P[pair[1]]) + (1 - delta) * np.maximum(P[pair[0]], P[pair[1]])
     P = np.delete(P, pair, axis=0)  # remove two rows
@@ -95,7 +101,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps=0.1, delta=0.5,
             rows_to_subtrees[i] = rows_to_subtrees[i + 1]
     rows_to_subtrees = rows_to_subtrees[:-1]
     rows_to_subtrees[-1] = n_cells + iter
-    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees, eps, delta, coef, rng)
+    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng)
     
     
     prior_prob = prior_prob * prob[pair]
@@ -128,8 +134,23 @@ if __name__ == "__main__":
                         help="False-positive rate (alpha in the paper)", required=True)
     parser.add_argument("-fn", "--beta", type=float,                                                        
                         help="False-negative rate (beta in the paper)", required=True)
+    parser.add_argument("-o", "--output", type=str,                                                        
+                        help="Desired path for output", required=True)
+
+
     parser.add_argument("-s", "--seed", type=int,                                                        
                         help="random seed", required=False, default=None)
-    
+    #parser.add_argument("-c", "--coef", type=float,                                                        
+    #                     help="coef", required=False, default=10.0)           
+    #parser.add_argument("-e", "--epsilon", type=float,                                                        
+    #                     help="epsilon", required=False, default=0.1) 
+    #parser.add_argument("-d", "--delta", type=float,                                                        
+    #                     help="delta", required=False, default=0.8)                    
+    # parser.add_argument("-di", "--divide", type=bool,                                                        
+    #                     help="If True, use divide normalizaion with parameter divide_factor", required=False, default=False)
+    # parser.add_argument("-df", "--divide_factor", type=float,                                                        
+    #                     help="divide_factor", required=False, default=10)
+
+
     args = parser.parse_args()
-    main(args.input_matrix, args.num_samples, args.alpha, args.beta, args.seed)
+    main(args.input_matrix, args.num_samples, args.alpha, args.beta, args.output, args.seed)

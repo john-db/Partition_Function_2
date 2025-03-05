@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import treeswift as ts
+#import treeswift as ts
 from IPython import embed
 import sys, time
 
