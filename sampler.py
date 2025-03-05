@@ -1,6 +1,5 @@
 import numpy as np
 import numpy.linalg as la
-from scipy.special import softmax
 from sklearn.metrics.pairwise import pairwise_distances
 import argparse
 import pandas as pd
@@ -74,7 +73,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     else:
         dist = -dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
 
-    prob = softmax(-dist).astype(np.float64) #do we need to cast?
+    prob = np.exp(-dist) / np.sum(np.exp(-dist)) # softmax
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
 
