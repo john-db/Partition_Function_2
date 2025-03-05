@@ -1,5 +1,4 @@
 import numpy as np
-import numpy.linalg as la
 from sklearn.metrics.pairwise import pairwise_distances
 import argparse
 import pandas as pd
@@ -52,7 +51,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     if P.shape[0] == 1:
         return subtrees, np.float64(1), np.float64(1)
     
-    dist = pairwise_distances(P, metric=(lambda a,b : la.norm(a - b) - row_leafness_score(a, b) * coef))
+    dist = pairwise_distances(P, metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
     dist = dist.astype(np.float64) #do we need to cast?
     np.fill_diagonal(dist, np.inf)
 
@@ -118,9 +117,6 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     norm_factor = norm_factor * q_i
 
     return subtrees, prior_prob, norm_factor
-
-def row_leafness_score(row_a, row_b):
-    return np.sum(np.minimum(row_a, row_b))
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run.py')
