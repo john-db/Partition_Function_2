@@ -1,6 +1,6 @@
 Command to sample trees
 
-`python sampler.py -i ./example/input_genotype_matrix.tsv -n 1000 -fp 0.001 -fn 0.4 -s 42 > example_sample.sample`
+`python sampler.py -i ./example/input_genotype_matrix.tsv -n 1000 -fp 0.001 -fn 0.4 -s 42 -o ./example_sample.sample`
 
 Command to compute partition function estimates
 
