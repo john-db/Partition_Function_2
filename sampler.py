@@ -53,10 +53,8 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
         return subtrees, np.float64(1), np.float64(1)
     
     # TODO: implement pairwise_distances so that it does not require P to be copied
-    #dist = pairwise_distances(P[rows_to_subtrees], metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
-    #dist = dist.astype(np.float64) #do we need to cast?
 
-    dist = np.zeros(shape=(len(rows_to_subtrees), len(rows_to_subtrees)))
+    dist = np.zeros(shape=(len(rows_to_subtrees), len(rows_to_subtrees)), dtype=np.float64)
     for row in range(P[rows_to_subtrees].shape[0]):
         dist[row] = np.sqrt(np.sum((np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape) - P[rows_to_subtrees]) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape), P[rows_to_subtrees]), axis=1)
 
@@ -85,15 +83,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     
     rows_to_subtrees_copy = rows_to_subtrees.copy()
 
-    # use slicing: rows_to_subtrees[min : end] = rows_to_subtrees[min + 1 : end]
-    # use slicing: rows_to_subtrees[max : end] = rows_to_subtrees[max + 1 : end]
-    # for i in range(len(rows_to_subtrees) - 1):
-    #     if i >= np.min(pair):
-    #         rows_to_subtrees[i] = rows_to_subtrees[i + 1]
     rows_to_subtrees[np.min(pair):-1] = rows_to_subtrees[np.min(pair) + 1:]
-    # for i in range(len(rows_to_subtrees) - 1):
-    #     if i >= np.max(pair) - 1:
-    #         rows_to_subtrees[i] = rows_to_subtrees[i + 1]
     rows_to_subtrees[np.max(pair) - 1:-1] = rows_to_subtrees[np.max(pair):]
     rows_to_subtrees = rows_to_subtrees[:-1]
     rows_to_subtrees[-1] = n_cells + iter
