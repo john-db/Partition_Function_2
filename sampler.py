@@ -53,13 +53,20 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
         return subtrees, np.float64(1), np.float64(1)
     
     # TODO: implement pairwise_distances so that it does not require P to be copied
-    dist = pairwise_distances(P[rows_to_subtrees], metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
-    dist = dist.astype(np.float64) #do we need to cast?
+    #dist = pairwise_distances(P[rows_to_subtrees], metric=(lambda a,b : np.linalg.norm(a - b) - np.sum(np.minimum(a, b)) * coef))
+    #dist = dist.astype(np.float64) #do we need to cast?
+
+    dist = np.zeros(shape=(len(rows_to_subtrees), len(rows_to_subtrees)))
+    for row in range(P[rows_to_subtrees].shape[0]):
+        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape) - P[rows_to_subtrees]) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape), P[rows_to_subtrees]), axis=1)
     np.fill_diagonal(dist, np.inf)
 
     dist = -dist
     dist = dist - np.max(dist.flat) # normalize
+    # should be able to replace this with dist = -(dist - np.min(dist))
+
     if divide:
+        #move this to before we filled diagonals with infs, then we can just use np.min/max to find the value we want
         #divide to normalize to max:0 min: -divide_factor
 
         dabs_max = 0
@@ -74,7 +81,8 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     else:
         dist = -dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
 
-    prob = np.exp(-dist) / np.sum(np.exp(-dist)) # softmax
+    dist_exp = np.exp(-dist) #does this get re-initialized each recursive call?
+    prob = dist_exp / np.sum(dist_exp) # softmax
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
 
@@ -84,6 +92,8 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     
     rows_to_subtrees_copy = rows_to_subtrees.copy()
 
+    # use slicing: rows_to_subtrees[min : end] = rows_to_subtrees[min + 1 : end]
+    # use slicing: rows_to_subtrees[max : end] = rows_to_subtrees[max + 1 : end]
     for i in range(len(rows_to_subtrees) - 1):
         if i >= np.min(pair):
             rows_to_subtrees[i] = rows_to_subtrees[i + 1]
@@ -93,7 +103,7 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     rows_to_subtrees = rows_to_subtrees[:-1]
     rows_to_subtrees[-1] = n_cells + iter
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng)
-    
+    # keep what was deleted and undo before recursion to avoid copy
     
     prior_prob = prior_prob * prob[pair]
     
