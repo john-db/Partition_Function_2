@@ -87,12 +87,14 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
 
     # use slicing: rows_to_subtrees[min : end] = rows_to_subtrees[min + 1 : end]
     # use slicing: rows_to_subtrees[max : end] = rows_to_subtrees[max + 1 : end]
-    for i in range(len(rows_to_subtrees) - 1):
-        if i >= np.min(pair):
-            rows_to_subtrees[i] = rows_to_subtrees[i + 1]
-    for i in range(len(rows_to_subtrees) - 1):
-        if i >= np.max(pair) - 1:
-            rows_to_subtrees[i] = rows_to_subtrees[i + 1]
+    # for i in range(len(rows_to_subtrees) - 1):
+    #     if i >= np.min(pair):
+    #         rows_to_subtrees[i] = rows_to_subtrees[i + 1]
+    rows_to_subtrees[np.min(pair):-1] = rows_to_subtrees[np.min(pair) + 1:]
+    # for i in range(len(rows_to_subtrees) - 1):
+    #     if i >= np.max(pair) - 1:
+    #         rows_to_subtrees[i] = rows_to_subtrees[i + 1]
+    rows_to_subtrees[np.max(pair) - 1:-1] = rows_to_subtrees[np.max(pair):]
     rows_to_subtrees = rows_to_subtrees[:-1]
     rows_to_subtrees[-1] = n_cells + iter
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng)
