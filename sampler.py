@@ -59,27 +59,20 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     dist = np.zeros(shape=(len(rows_to_subtrees), len(rows_to_subtrees)))
     for row in range(P[rows_to_subtrees].shape[0]):
         dist[row] = np.sqrt(np.sum((np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape) - P[rows_to_subtrees]) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape), P[rows_to_subtrees]), axis=1)
-    np.fill_diagonal(dist, np.inf)
 
-    dist = -dist
-    dist = dist - np.max(dist.flat) # normalize
-    # should be able to replace this with dist = -(dist - np.min(dist))
+    np.fill_diagonal(dist, np.inf)
+    dist = dist - np.min(dist)
 
     if divide:
         #move this to before we filled diagonals with infs, then we can just use np.min/max to find the value we want
         #divide to normalize to max:0 min: -divide_factor
-
-        dabs_max = 0
-        for entry in dist.flat:
-            if entry != float('-inf') and entry != float('inf') and abs(entry) > dabs_max:
-                dabs_max = abs(entry)
-
-        if dabs_max != 0:
-            dist = -dist * (divide_factor / dabs_max)
-        else:
-            dist = -dist
+        np.fill_diagonal(dist, 0)
+        if np.max(dist) != 0:
+            dist = dist * (divide_factor / np.max(dist))
+        
+        np.fill_diagonal(dist, np.inf)
     else:
-        dist = -dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
+        dist = dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
 
     dist_exp = np.exp(-dist) #does this get re-initialized each recursive call?
     prob = dist_exp / np.sum(dist_exp) # softmax
