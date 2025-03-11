@@ -35,7 +35,8 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
             rng: Numpy random number generator object
     Returns:
         subtrees: matrix of subtrees representing the sampled BCLT
-        norm_factor: the correction factor (probability of that tree topology being sampled)
+        prior_prob: the probability of that sequence of subtree merges in the sampling
+        norm_factor: the correction factor (to be used with prior_prob to find the probability of that tree topology being sampled)
     """
 
     n_cells = P.shape[0]
@@ -45,14 +46,28 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     init_dist = np.zeros((init_P.shape[0], init_P.shape[0]), dtype=np.float64)
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    subtrees, prob, corr = sample_rec(init_P, init_subtrees, init_dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
-    return subtrees[n_cells:-1], prob, corr
+    subtrees, prior_prob, norm_factor = sample_rec(init_P, init_subtrees, init_dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+    return subtrees[n_cells:-1], prior_prob, norm_factor
 
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
+    """
+    Recursive function for the bottum-up sampling of trees
+    Parameters:
+        P: the matrix of n rows/cells and m mutations/columns with
+            P_i,j = Pr[X_i,j = 1]
+            eps, delta, coef, divide/divide_factor: hyperparameters (TODO: describe these)
+            rng: Numpy random number generator object
+    Returns:
+        subtrees: matrix of subtrees representing the sampled BCLT
+        prior_prob: the probability of that sequence of subtree merges in the sampling
+        norm_factor: the correction factor (to be used with prior_prob to find the probability of that tree topology being sampled)
+    """
     
+    #base case
     if current_indices.size == 1:
         return subtrees, np.float64(1), np.float64(1)
 
+    #creation of distance matrix
     for row in range(dist.shape[0]):
         if row in current_indices:
             dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
@@ -69,7 +84,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
         if np.nanmax(dist) != 0:
             dist = dist * (divide_factor / np.nanmax(dist))
     else:
-        # this effectively changes the base of the softmax from e to 1+eps
+        # this effectively changes the base of the softmax to 1+eps
         dist = dist * np.log(1 + eps)
 
     np.nan_to_num(dist, nan=np.inf, copy=False)
@@ -97,8 +112,6 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     current_indices[np.min(pair)] = removed[0]
     current_indices[np.max(pair)] = removed[1]
     
-    prior_prob = prior_prob * prob.flat[ind]
-    
     accum = 0
     for i in range(len(prob.flat)):
         if prob.flat[i] == 0:
@@ -113,9 +126,8 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
             accum += prob.flat[i]
 
     q_i = prob.flat[ind] / accum
-    norm_factor = norm_factor * q_i
 
-    return subtrees, prior_prob, norm_factor
+    return subtrees, prior_prob * prob.flat[ind], norm_factor * q_i
     
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='run.py')
