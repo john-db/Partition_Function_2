@@ -93,7 +93,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
 
     subtrees[n_cells + iter] = subtrees[current_indices[np.min(pair)]] + subtrees[current_indices[np.max(pair)]] #merge the 2 subtrees
 
-    removed = (current_indices[np.min(pair)], current_indices[np.max(pair)], current_indices[-2])
+    removed = (current_indices[np.min(pair)], current_indices[np.max(pair)]) #, current_indices[-2])
 
     current_indices[np.min(pair):-1] = current_indices[np.min(pair) + 1:]
     current_indices[np.max(pair) - 1:-1] = current_indices[np.max(pair):]
@@ -101,7 +101,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
 
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, iter + 1, current_indices[:-1], eps, delta, coef, divide, divide_factor, rng)
     
-    # rows_to_subtrees[-2] = removed[2] # it works without this line, why?
+    # current_indices[-2] = removed[2] # it works without this line, why?
     current_indices[np.max(pair):] = current_indices[np.max(pair) - 1:-1]
     current_indices[np.min(pair) + 1:] = current_indices[np.min(pair):-1]
     current_indices[np.min(pair)] = removed[0]
