@@ -1,11 +1,8 @@
 import numpy as np
-from sklearn.metrics.pairwise import pairwise_distances
 import argparse
 import pandas as pd
-import time
 
 def main(path, num_samples, alpha, beta, out_path, seed=None):
-    start = time.time()
     df = pd.read_csv(path, sep="\t", index_col=[0])
 
     # Here we create the matrix representing the probability distribution of the ground truth,
@@ -26,9 +23,6 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
                 f.write(str(prob_sequence / correction) + " " + "".join(map(lambda x: str(int(x)), subtrees.flatten())) + "\n") # There is probably a better way to do this 
     except FileExistsError:
         print("The path provided for the output file already exists.")
-    
-    end = time.time()
-    print(end-start)
     
 
 def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
