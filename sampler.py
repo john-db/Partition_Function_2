@@ -41,41 +41,49 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     n_cells = P.shape[0]
     # We only need the subtree
     init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype='bool')
-    init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype = P.dtype)))
+    init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
+    init_dist = np.zeros((init_P.shape[0], init_P.shape[0]), dtype=np.float64)
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    subtrees, prob, corr = sample_rec(init_P, init_subtrees, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+    subtrees, prob, corr = sample_rec(init_P, init_subtrees, init_dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prob, corr
 
-def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng=None):
+def sample_rec(P, subtrees, dist, n_cells, iter, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng=None):
     
     if rows_to_subtrees.size == 1:
         return subtrees, np.float64(1), np.float64(1)
     
     # TODO: implement pairwise_distances so that it does not require P to be copied
 
-    dist = np.zeros(shape=(len(rows_to_subtrees), len(rows_to_subtrees)), dtype=np.float64)
-    for row in range(P[rows_to_subtrees].shape[0]):
-        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape) - P[rows_to_subtrees]) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[rows_to_subtrees][row], shape=P[rows_to_subtrees].shape), P[rows_to_subtrees]), axis=1)
+    for row in range(dist.shape[0]):
+        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
 
-    np.fill_diagonal(dist, np.inf)
-    dist = dist - np.min(dist)
+    mask = np.ones(dist.shape, dtype='bool')
+    # The for loops are meant to be temporary, need to find a better way to do this
+    for x in range(dist.shape[0]):
+        for y in range(dist.shape[1]):
+            if x in rows_to_subtrees and y in rows_to_subtrees:
+                mask[x][y] = False
+    #mask[rows_to_subtrees, :] = False
+    #mask[:, rows_to_subtrees] = False
+    dist[mask] = np.nan
+    np.fill_diagonal(dist, np.nan)
+    dist = dist - np.nanmin(dist)
 
     if divide:
         #move this to before we filled diagonals with infs, then we can just use np.min/max to find the value we want
         #divide to normalize to max:0 min: -divide_factor
-        np.fill_diagonal(dist, 0)
-        if np.max(dist) != 0:
-            dist = dist * (divide_factor / np.max(dist))
-        
-        np.fill_diagonal(dist, np.inf)
+        if np.nanmax(dist) != 0:
+            dist = dist * (divide_factor / np.nanmax(dist))
     else:
         dist = dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
 
+    np.nan_to_num(dist, nan=np.inf, copy=False)
     dist_exp = np.exp(-dist) #does this get re-initialized each recursive call?
     prob = dist_exp / np.sum(dist_exp) # softmax
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
+    pair = np.searchsorted(rows_to_subtrees, pair)
 
     P[n_cells + iter] = delta * np.minimum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) + (1 - delta) * np.maximum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) #add the new row to the matrix P
 
@@ -87,19 +95,23 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     rows_to_subtrees[np.max(pair) - 1:-1] = rows_to_subtrees[np.max(pair):]
     rows_to_subtrees[-2] = n_cells + iter
 
-    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees[:-1], eps, delta, coef, divide, divide_factor, rng)
+    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, iter + 1, rows_to_subtrees[:-1], eps, delta, coef, divide, divide_factor, rng)
     
-    rows_to_subtrees[-2] = removed[2]
+    # rows_to_subtrees[-2] = removed[2] # it works without this line, why?
     rows_to_subtrees[np.max(pair):] = rows_to_subtrees[np.max(pair) - 1:-1]
     rows_to_subtrees[np.min(pair) + 1:] = rows_to_subtrees[np.min(pair):-1]
     rows_to_subtrees[np.min(pair)] = removed[0]
     rows_to_subtrees[np.max(pair)] = removed[1]
     
-    prior_prob = prior_prob * prob[pair]
+    prior_prob = prior_prob * prob.flat[ind]
     
     accum = 0
     for i in range(len(prob.flat)):
+        if prob.flat[i] == 0:
+            continue
+
         pair_i = np.unravel_index(i, prob.shape)
+        pair_i = np.searchsorted(rows_to_subtrees, pair_i)
         st1 = subtrees[rows_to_subtrees[np.min(pair_i)]]
         st2 = subtrees[rows_to_subtrees[np.max(pair_i)]]
 
