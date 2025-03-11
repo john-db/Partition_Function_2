@@ -68,7 +68,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
             dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
         else:
             dist[row] = np.full(dist.shape[1], np.nan)
-    dist[:, ~np.isin(np.arange(dist.shape[1]), current_indices)] = np.nan
+    dist[:, np.isin(np.arange(dist.shape[1]), current_indices, assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
     np.fill_diagonal(dist, np.nan)
 
     #subtract to normalize distances to have minimum of zero
