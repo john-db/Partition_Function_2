@@ -80,23 +80,28 @@ def sample_rec(P, subtrees, n_cells, iter, rows_to_subtrees, eps, delta, coef, d
     P[n_cells + iter] = delta * np.minimum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) + (1 - delta) * np.maximum(P[rows_to_subtrees[np.min(pair)]], P[rows_to_subtrees[np.max(pair)]]) #add the new row to the matrix P
 
     subtrees[n_cells + iter] = subtrees[rows_to_subtrees[np.min(pair)]] + subtrees[rows_to_subtrees[np.max(pair)]] #merge the 2 subtrees
-    
-    rows_to_subtrees_copy = rows_to_subtrees.copy()
+
+    removed = (rows_to_subtrees[np.min(pair)], rows_to_subtrees[np.max(pair)], rows_to_subtrees[-2])
 
     rows_to_subtrees[np.min(pair):-1] = rows_to_subtrees[np.min(pair) + 1:]
     rows_to_subtrees[np.max(pair) - 1:-1] = rows_to_subtrees[np.max(pair):]
-    rows_to_subtrees = rows_to_subtrees[:-1]
-    rows_to_subtrees[-1] = n_cells + iter
-    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees, eps, delta, coef, divide, divide_factor, rng)
-    # keep what was deleted and undo before recursion to avoid copy
+    rows_to_subtrees[-2] = n_cells + iter
+
+    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, n_cells, iter + 1, rows_to_subtrees[:-1], eps, delta, coef, divide, divide_factor, rng)
+    
+    rows_to_subtrees[-2] = removed[2]
+    rows_to_subtrees[np.max(pair):] = rows_to_subtrees[np.max(pair) - 1:-1]
+    rows_to_subtrees[np.min(pair) + 1:] = rows_to_subtrees[np.min(pair):-1]
+    rows_to_subtrees[np.min(pair)] = removed[0]
+    rows_to_subtrees[np.max(pair)] = removed[1]
     
     prior_prob = prior_prob * prob[pair]
     
     accum = 0
     for i in range(len(prob.flat)):
         pair_i = np.unravel_index(i, prob.shape)
-        st1 = subtrees[rows_to_subtrees_copy[np.min(pair_i)]]
-        st2 = subtrees[rows_to_subtrees_copy[np.max(pair_i)]]
+        st1 = subtrees[rows_to_subtrees[np.min(pair_i)]]
+        st2 = subtrees[rows_to_subtrees[np.max(pair_i)]]
 
         if any(np.equal(subtrees, st1 + st2).all(1)):
             accum += prob.flat[i]
