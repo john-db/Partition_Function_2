@@ -2,8 +2,10 @@ import numpy as np
 from sklearn.metrics.pairwise import pairwise_distances
 import argparse
 import pandas as pd
+import time
 
 def main(path, num_samples, alpha, beta, out_path, seed=None):
+    start = time.time()
     df = pd.read_csv(path, sep="\t", index_col=[0])
 
     # Here we create the matrix representing the probability distribution of the ground truth,
@@ -25,6 +27,9 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
     except FileExistsError:
         print("The path provided for the output file already exists.")
     
+    end = time.time()
+    print(end-start)
+    
 
 def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
     """
@@ -41,7 +46,7 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
 
     n_cells = P.shape[0]
     # We only need the subtree
-    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype='bool')
+    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
     init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
     init_dist = np.zeros((init_P.shape[0], init_P.shape[0]), dtype=np.float64)
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
@@ -52,11 +57,7 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
     """
     Recursive function for the bottum-up sampling of trees
-    Parameters:
-        P: the matrix of n rows/cells and m mutations/columns with
-            P_i,j = Pr[X_i,j = 1]
-            eps, delta, coef, divide/divide_factor: hyperparameters (TODO: describe these)
-            rng: Numpy random number generator object
+
     Returns:
         subtrees: matrix of subtrees representing the sampled BCLT
         prior_prob: the probability of that sequence of subtree merges in the sampling
