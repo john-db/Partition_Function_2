@@ -52,31 +52,36 @@ def sample_rec(P, subtrees, dist, n_cells, iter, rows_to_subtrees, eps, delta, c
     
     if rows_to_subtrees.size == 1:
         return subtrees, np.float64(1), np.float64(1)
-    
-    # TODO: implement pairwise_distances so that it does not require P to be copied
 
     for row in range(dist.shape[0]):
-        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
+        if row in rows_to_subtrees:
+            dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
+        else:
+            dist[row] = np.full(dist.shape[1], np.nan)
 
-    mask = np.ones(dist.shape, dtype='bool')
-    # The for loops are meant to be temporary, need to find a better way to do this
-    for x in range(dist.shape[0]):
-        for y in range(dist.shape[1]):
-            if x in rows_to_subtrees and y in rows_to_subtrees:
-                mask[x][y] = False
-    #mask[rows_to_subtrees, :] = False
-    #mask[:, rows_to_subtrees] = False
-    dist[mask] = np.nan
+    dist[:, ~np.isin(np.arange(dist.shape[1]), rows_to_subtrees)] = np.nan
+
+    # mask = np.ones(dist.shape, dtype='bool')
+    # # The for loops are meant to be temporary, need to find a better way to do this
+    # for x in range(dist.shape[0]):
+    #     for y in range(dist.shape[1]):
+    #         if x in rows_to_subtrees and y in rows_to_subtrees:
+    #             mask[x][y] = False
+    # #mask[rows_to_subtrees, :] = False
+    # #mask[:, rows_to_subtrees] = False
+    # dist[mask] = np.nan
     np.fill_diagonal(dist, np.nan)
+
+    #subtract to normalize distances to have minimum of zero
     dist = dist - np.nanmin(dist)
 
     if divide:
-        #move this to before we filled diagonals with infs, then we can just use np.min/max to find the value we want
-        #divide to normalize to max:0 min: -divide_factor
+        #divide to normalize distances to have max equal to divide_factor
         if np.nanmax(dist) != 0:
             dist = dist * (divide_factor / np.nanmax(dist))
     else:
-        dist = dist * np.log(1 + eps) # this effectively changes the base of the softmax from e to 1+eps
+        # this effectively changes the base of the softmax from e to 1+eps
+        dist = dist * np.log(1 + eps)
 
     np.nan_to_num(dist, nan=np.inf, copy=False)
     dist_exp = np.exp(-dist) #does this get re-initialized each recursive call?
