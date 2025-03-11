@@ -45,7 +45,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
     # (i.e. the singletons and the subtree containing all leaves), and also a row representing the possibility
     # that a given mutation is not present in any cell of the tree (row of all zeros)
     
-    trivial_subtrees = np.concatenate((np.diag(np.ones(num_cells, dtype='bool')), np.ones((1, num_cells), dtype='bool'), np.zeros((1, num_cells), dtype='bool')))
+    trivial_subtrees = np.concatenate((np.diag(np.ones(num_cells, dtype=np.bool)), np.ones((1, num_cells), dtype=np.bool), np.zeros((1, num_cells), dtype=np.bool)))
     with open(path_trees, 'r') as file:
         for line in file:
             line = line.strip()
@@ -53,7 +53,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
             log_sampling_prob = np.log2(np.float64(split[0])) # read the sampling probability
 
             # Now we read the nontrivial subtrees into a 2d array
-            nontrivial_subtrees = np.zeros(shape=(num_cells - 2, num_cells), dtype='bool')
+            nontrivial_subtrees = np.zeros(shape=(num_cells - 2, num_cells), dtype=np.bool)
             for idx in range(len(split[1])):
                 nontrivial_subtrees[np.unravel_index(idx, nontrivial_subtrees.shape)] = bool(int(split[1][idx]))
             # We put the nontrivial and trivial subtrees together to form the subtrees array for the given tree
@@ -67,7 +67,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, clade=None, mutatio
             # for each clade/mutation pair to be evaluated, we compute its numerator
             for i in range(len(numerators)):
                 cell_ids = [list(df.index).index(cell) for cell in pairs[i][0]]
-                cells_vec = np.zeros(P.shape[0], dtype='bool')
+                cells_vec = np.zeros(P.shape[0], dtype=np.bool)
                 cells_vec[cell_ids] = 1
                 mut_id = list(df.columns).index(pairs[i][1])
 
