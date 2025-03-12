@@ -42,8 +42,14 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     # We only need the subtree
     init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
     init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
-    init_dist = np.zeros((init_P.shape[0], init_P.shape[0]), dtype=np.float64)
     np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
+
+    init_dist = np.full((init_P.shape[0], init_P.shape[0]), np.nan, dtype=np.float64)
+    #creation of distance matrix
+    for row in range(n_cells):
+        init_dist[row] = np.sqrt(np.sum((np.broadcast_to(init_P[row], shape=init_P.shape) - init_P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(init_P[row], shape=init_P.shape), init_P), axis=1)
+    init_dist[:, np.isin(np.arange(init_dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
+    np.fill_diagonal(init_dist, np.nan)
 
     subtrees, prior_prob, norm_factor = sample_rec(init_P, init_subtrees, init_dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prior_prob, norm_factor
@@ -62,42 +68,44 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     if current_indices.size == 1:
         return subtrees, np.float64(1), np.float64(1)
 
-    #creation of distance matrix
-    for row in range(dist.shape[0]):
-        if row in current_indices:
-            dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
-        else:
-            dist[row] = np.full(dist.shape[1], np.nan)
-    dist[:, np.isin(np.arange(dist.shape[1]), current_indices, assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
-    np.fill_diagonal(dist, np.nan)
-
     #subtract to normalize distances to have minimum of zero
-    dist = dist - np.nanmin(dist)
-
+    prob = dist - np.nanmin(dist)
     if divide:
         #divide to normalize distances to have max equal to divide_factor
-        if np.nanmax(dist) != 0:
-            dist = dist * (divide_factor / np.nanmax(dist))
+        if np.nanmax(prob) != 0:
+            prob *= -(divide_factor / np.nanmax(prob))
     else:
         # this effectively changes the base of the softmax to 1+eps
-        dist = dist * np.log(1 + eps)
+        prob *= -np.log(1 + eps)
+    np.nan_to_num(prob, nan= -np.inf, copy=False)
+    prob = np.exp(prob)
+    prob *= 1 / np.sum(prob) # softmax
 
-    np.nan_to_num(dist, nan=np.inf, copy=False)
-    dist_exp = np.exp(-dist) #does this get re-initialized each recursive call?
-    prob = dist_exp / np.sum(dist_exp) # softmax
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
     pair = np.searchsorted(current_indices, pair)
 
-    P[n_cells + iter] = delta * np.minimum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) + (1 - delta) * np.maximum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) #add the new row to the matrix P
-
     subtrees[n_cells + iter] = subtrees[current_indices[np.min(pair)]] + subtrees[current_indices[np.max(pair)]] #merge the 2 subtrees
+    P[n_cells + iter] = delta * np.minimum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) + (1 - delta) * np.maximum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) #add the new row to the matrix P
+    dist[n_cells + iter] = np.sqrt(np.sum((np.broadcast_to(P[n_cells + iter], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[n_cells + iter], shape=P.shape), P), axis=1)
+    dist[:, n_cells + iter] = dist[n_cells + iter]
+    
+    
 
     removed = (current_indices[np.min(pair)], current_indices[np.max(pair)]) #, current_indices[-2])
 
     current_indices[np.min(pair):-1] = current_indices[np.min(pair) + 1:]
     current_indices[np.max(pair) - 1:-1] = current_indices[np.max(pair):]
     current_indices[-2] = n_cells + iter
+
+    dist[n_cells + iter, np.isin(np.arange(dist.shape[1]), current_indices[:-1], assume_unique=True, invert=True)] = np.nan
+    dist[np.isin(np.arange(dist.shape[1]), current_indices[:-1], assume_unique=True, invert=True), n_cells + iter] = np.nan
+    dist[n_cells + iter, n_cells + iter] = np.nan
+
+    dist[removed[0], :] = np.nan
+    dist[:, removed[0]] = np.nan
+    dist[removed[1], :] = np.nan
+    dist[:, removed[1]] = np.nan
 
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, iter + 1, current_indices[:-1], eps, delta, coef, divide, divide_factor, rng)
     
