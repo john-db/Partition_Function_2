@@ -4,6 +4,12 @@ import pandas as pd
 
 def main(path, num_samples, alpha, beta, out_path, seed=None):
     df = pd.read_csv(path, sep="\t", index_col=[0])
+    rng = np.random.default_rng(seed=seed)
+    eps=0.1
+    delta=0.8
+    coef=10
+    divide=True
+    divide_factor=10
 
     # Here we create the matrix representing the probability distribution of the ground truth,
     #   i.e. the entry i,j is the probability that entry i,j of the ground truth matrix equals 1,
@@ -14,18 +20,29 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
     P = t1 + t2
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
 
-    rng = np.random.default_rng(seed=seed)
+    n_cells = P.shape[0]
+    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
+    P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
+    np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
+
+    # Creation of initial distance matrix
+    dist = np.full((P.shape[0], P.shape[0]), np.nan, dtype=np.float64)
+    for row in range(n_cells):
+        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
+    dist[:, np.isin(np.arange(dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
+    np.fill_diagonal(dist[:n_cells], np.nan)
+
     try:
         with open(out_path, "x") as f:
             for _ in range(num_samples):
-                subtrees, prob_sequence, correction = draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=True, divide_factor=10, rng=rng)
+                subtrees, prob_sequence, correction = draw_sample_bclt(P.copy(), init_subtrees.copy(), dist.copy(), n_cells, eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
                 # Print the probability that the tree was sampled followed by the (nontrivial) subtrees
                 f.write(str(prob_sequence / correction) + " " + "".join(map(lambda x: str(int(x)), subtrees.flatten())) + "\n") # There is probably a better way to do this 
     except FileExistsError:
         print("The path provided for the output file already exists.")
     
 
-def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
+def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
     """
     Parameters:
         P: the matrix of n rows/cells and m mutations/columns with
@@ -38,24 +55,14 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
         norm_factor: the correction factor (to be used with prior_prob to find the probability of that tree topology being sampled)
     """
 
-    n_cells = P.shape[0]
-    subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
-    P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
-    np.fill_diagonal(subtrees, True) # Add 1s for the singleton clades/subtrees
-
-    dist = np.full((P.shape[0], P.shape[0]), np.nan, dtype=np.float64)
-    #creation of distance matrix
-    for row in range(n_cells):
-        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
-    dist[:, np.isin(np.arange(dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
-    np.fill_diagonal(dist[:n_cells], np.nan)
-
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prior_prob, norm_factor
 
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
     """
-    Recursive function for the bottum-up sampling of trees
+    Recursive function for the bottom-up sampling of trees. The arrays (P, subtrees, dist) have been initialized to have enough space to contain
+    all values that they will during the execution of the function, and current_indices keeps track of indices of these array
+    are currently being used.
 
     Returns:
         subtrees: matrix of subtrees representing the sampled BCLT
@@ -89,8 +96,6 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     dist[n_cells + iter] = np.sqrt(np.sum((np.broadcast_to(P[n_cells + iter], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[n_cells + iter], shape=P.shape), P), axis=1)
     dist[:, n_cells + iter] = dist[n_cells + iter]
     
-    
-
     removed = (current_indices[np.min(pair)], current_indices[np.max(pair)]) #, current_indices[-2])
 
     current_indices[np.min(pair):-1] = current_indices[np.min(pair) + 1:]
