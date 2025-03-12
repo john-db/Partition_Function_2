@@ -39,19 +39,18 @@ def draw_sample_bclt(P, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor
     """
 
     n_cells = P.shape[0]
-    # We only need the subtree
-    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
-    init_P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
-    np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
+    subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
+    P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
+    np.fill_diagonal(subtrees, True) # Add 1s for the singleton clades/subtrees
 
-    init_dist = np.full((init_P.shape[0], init_P.shape[0]), np.nan, dtype=np.float64)
+    dist = np.full((P.shape[0], P.shape[0]), np.nan, dtype=np.float64)
     #creation of distance matrix
     for row in range(n_cells):
-        init_dist[row] = np.sqrt(np.sum((np.broadcast_to(init_P[row], shape=init_P.shape) - init_P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(init_P[row], shape=init_P.shape), init_P), axis=1)
-    init_dist[:, np.isin(np.arange(init_dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
-    np.fill_diagonal(init_dist, np.nan)
+        dist[row] = np.sqrt(np.sum((np.broadcast_to(P[row], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[row], shape=P.shape), P), axis=1)
+    dist[:, np.isin(np.arange(dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
+    np.fill_diagonal(dist[:n_cells], np.nan)
 
-    subtrees, prior_prob, norm_factor = sample_rec(init_P, init_subtrees, init_dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+    subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
     return subtrees[n_cells:-1], prior_prob, norm_factor
 
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
