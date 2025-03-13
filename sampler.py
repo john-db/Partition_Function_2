@@ -68,7 +68,7 @@ def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, di
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
     """
     Recursive function for the bottom-up sampling of trees. The arrays (P, subtrees, dist) have been initialized to have enough space to contain
-    all values that they will during the execution of the function, and current_indices keeps track of indices of these array
+    all values that they will during the execution of the function, and current_indices keeps track of indices of these arrays
     are currently being used.
 
     Returns:
@@ -81,7 +81,11 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     if current_indices.size == 1:
         return subtrees, np.float64(1), np.float64(1)
 
-    #subtract to normalize distances to have minimum of zero
+    
+    # Depending on the number of mutations, the distance values can be quite large in magnitude. This causes the
+    # probability distribution created by taking the softmax to be extremely skewed (i.e. one value from the distance matrix
+    # may have probability almost equal to 1)
+    # We have two approaches normalizing the matrix to make the resulting distribution less skewed below:
     prob = dist - np.nanmin(dist)
     if divide:
         #divide to normalize distances to have max equal to divide_factor
@@ -90,29 +94,41 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     else:
         # this effectively changes the base of the softmax to 1+eps
         prob *= -np.log(1 + eps)
+    
+    # Softmax
     np.nan_to_num(prob, nan= -np.inf, copy=False)
     prob = np.exp(prob)
-    prob *= 1 / np.sum(prob) # softmax
+    prob *= 1 / np.sum(prob)
 
+    # Draw a pair from the distribution, and find which "current_indices" value it corresponds to
     ind = rng.choice(len(prob.flat), p=prob.flat)
     pair = np.unravel_index(ind, prob.shape)
     pair = np.searchsorted(current_indices, pair)
 
+    # Update the arrays: 
+    # create a new subtree that is the result of merging the pair of subtrees that were selected
     subtrees[n_cells + iter] = subtrees[current_indices[np.min(pair)]] + subtrees[current_indices[np.max(pair)]] #merge the 2 subtrees
+    # create a new row of probabilities that each cell in the new subtree has each mutation
     P[n_cells + iter] = delta * np.minimum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) + (1 - delta) * np.maximum(P[current_indices[np.min(pair)]], P[current_indices[np.max(pair)]]) #add the new row to the matrix P
+    # create a new row and column in the distance matrix for this new subtree
     dist[n_cells + iter] = np.sqrt(np.sum((np.broadcast_to(P[n_cells + iter], shape=P.shape) - P) ** 2, axis=1)) - coef * np.sum(np.minimum(np.broadcast_to(P[n_cells + iter], shape=P.shape), P), axis=1)
     dist[:, n_cells + iter] = dist[n_cells + iter]
     
+    # store the values we are removing from current indices for later
     removed = (current_indices[np.min(pair)], current_indices[np.max(pair)]) #, current_indices[-2])
 
+    # shift current indices in order to remove the indices of the pair of selected subtrees
     current_indices[np.min(pair):-1] = current_indices[np.min(pair) + 1:]
     current_indices[np.max(pair) - 1:-1] = current_indices[np.max(pair):]
+    # add a new entry for the new subtree
     current_indices[-2] = n_cells + iter
 
+    # remove the entries in the new row/column that correspond to subtrees that are no longer "current"
     dist[n_cells + iter, np.isin(np.arange(dist.shape[1]), current_indices[:-1], assume_unique=True, invert=True)] = np.nan
     dist[np.isin(np.arange(dist.shape[1]), current_indices[:-1], assume_unique=True, invert=True), n_cells + iter] = np.nan
-    dist[n_cells + iter, n_cells + iter] = np.nan
+    dist[n_cells + iter, n_cells + iter] = np.nan # remove diagonal entry
 
+    # remove the entries corresponding to the selected subtrees from the distance matrix
     dist[removed[0], :] = np.nan
     dist[:, removed[0]] = np.nan
     dist[removed[1], :] = np.nan
@@ -120,12 +136,15 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
 
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, iter + 1, current_indices[:-1], eps, delta, coef, divide, divide_factor, rng)
     
+    # Reconstructs the state of current_indices from before the recursive call so we can accumulate probability
+    # of making progress towards the final tree
     # current_indices[-2] = removed[2] # it works without this line, why?
     current_indices[np.max(pair):] = current_indices[np.max(pair) - 1:-1]
     current_indices[np.min(pair) + 1:] = current_indices[np.min(pair):-1]
     current_indices[np.min(pair)] = removed[0]
     current_indices[np.max(pair)] = removed[1]
     
+    # Sum the probability of choosing any pair of subtrees to merge that would make progress towards the final tree
     accum = 0
     for i in range(len(prob.flat)):
         if prob.flat[i] == 0:
