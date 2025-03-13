@@ -46,7 +46,7 @@ def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
 
             numerators[j] += 2 ** Decimal(log_p1 + log_p2 - log_sampling_prob)
     
-    return numerators, denominator, trees[i], best_score
+    return numerators, denominator, trees[best_tree], best_score
 
 def read_trees(path_trees, num_cells):
     # The input file of trees contains on each line a sampling probability corresponding to a tree, 
