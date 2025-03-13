@@ -47,12 +47,12 @@ def log_pf_cond_numpy(logP1, logP0, subtrees, cells_vec, mutation):
     :param cond_m: one mutation
     :return: log 2 of the probability conditioned on the given tree...
     """
+    # If the clade (cells_vec) is in the subtrees, then we calculate the associated log probability
+    # Otherwise, the probability is zero (so log probability is -inf)
     if any(np.equal(subtrees, cells_vec).all(1)):
         col1 = logP1[:, mutation]
         col0 = logP0[:, mutation]
-        denominator = np.matmul(subtrees, col1) + np.matmul(1 - subtrees, col0)
-        denominator = np.exp2(denominator)
-        denominator = np.sum(denominator)
+        denominator = np.sum(np.exp2(np.matmul(subtrees, col1) + np.matmul(1 - subtrees, col0)))
         return np.dot(col1, cells_vec) + np.dot(col0, 1 - cells_vec) - np.log2(denominator)
     else:
         return np.float64('-inf')
