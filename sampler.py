@@ -46,7 +46,7 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
         for ls in lines:
             f.write("\n" + " ".join(ls))
 
-    print("Sampling finished in: " + str(start - time.time()))
+    print("Sampling finished in: " + str(time.time() - start) + " seconds")
     
 
 def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):

@@ -1,4 +1,4 @@
-import argparse
+import argparse, time
 import pandas as pd
 import numpy as np
 from decimal import Decimal
@@ -99,8 +99,11 @@ def partition_function(path_matrix, path_trees, alpha, beta, output, clade=None,
     else:
         pairs = [clade.split(','), mutation]
 
+    start = time.time()
     trees, log_sampling_probabilities = read_trees(path_trees, df.shape[0])
+    middle = time.time()
     numerators, denominator, tree, score = compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
+    end = time.time()
 
     # output partition function value for each clade,mutation pair, along with the inputted arguments
     try:
@@ -111,7 +114,10 @@ def partition_function(path_matrix, path_trees, alpha, beta, output, clade=None,
                 file.write("\n" + "\t".join(info))
     except FileExistsError:
         print("The path provided for the output file already exists.")
-    print(str(score) + " " + str(sts_to_newick(tree, df.index)))
+    print("The best tree scored was: " + str(sts_to_newick(tree, df.index)))
+    print("with a score of: " + str(score))
+    print("Parsing trees finished in: " + str(middle - start) + " seconds")
+    print("Computing estimates finished in: " + str(end - middle) + " seconds")
     
 
 
