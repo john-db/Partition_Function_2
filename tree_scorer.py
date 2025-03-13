@@ -42,7 +42,7 @@ def log_pf_cond_numpy(P, subtrees, cells_vec, mutation):
     Prob_{A\sim P}[\subtree(c, R, A)\cap A\in G| A\in T] in O(n^2).
 
     :param P:
-    :param subtrees: cell lineage tree  n x (2n+1)
+    :param subtrees: cell lineage tree  2n x n
     :param cells_vec: set of cells
     :param cond_m: one mutation
     :return: log 2 of the probability conditioned on the given tree...
@@ -70,8 +70,9 @@ def log_prob_mat_mul_calc(logP1, logP0, subtrees):
             and it has n (number of cells/leaves) columns
 
             If the tree which the subtrees matrix is representing is binary, then it has n - 1 internal nodes,
+            and one extra "subtree" of all zeros,
             in which case the dimension of the subtrees matrix would be
-            2n - 1 rows by n columns. if it is a nonbinary tree it will have fewer rows and the same number of columns.
+            2n rows by n columns. if it is a nonbinary tree it will have fewer rows and the same number of columns.
 
     Returns:
         The log base 2 of the probability that a matrix drawn from the distribution of the ground truth (represented in logP1 and logP0)
