@@ -21,9 +21,10 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
 
     n_cells = P.shape[0]
-    init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool)
+    init_subtrees = np.zeros((2 * n_cells, n_cells), dtype=np.bool_)
+    #init_subtrees = np.zeros((2 * n_cells - 1, n_cells), dtype=np.bool_)
     P = np.concatenate((P, np.zeros((n_cells - 1, P.shape[1]), dtype=P.dtype)))
-    np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton clades/subtrees
+    np.fill_diagonal(init_subtrees, True) # Add 1s for the singleton subtrees
 
     # Creation of initial distance matrix
     dist = np.full((P.shape[0], P.shape[0]), np.nan, dtype=np.float64)
@@ -32,12 +33,17 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
     dist[:, np.isin(np.arange(dist.shape[1]), np.arange(n_cells), assume_unique=True, invert=True)] = np.nan # check if assume_unique=True and invert (as opposed to ~) speed this up? it seems that they dont from a small test
     np.fill_diagonal(dist[:n_cells], np.nan)
 
+    lines = [None] * num_samples
+    for i in range(num_samples):
+        subtrees, prob_sequence, correction = draw_sample_bclt(P.copy(), init_subtrees.copy(), dist.copy(), n_cells, eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
+        # Stores the probability that the tree was sampled followed by the number of subtrees in the array, and then the subtrees linearized
+        lines[i] = [str(prob_sequence / correction), str(subtrees.shape[0]), "".join(map(lambda x: str(int(x)), subtrees.flatten()))]
+                
     try:
         with open(out_path, "x") as f:
-            for _ in range(num_samples):
-                subtrees, prob_sequence, correction = draw_sample_bclt(P.copy(), init_subtrees.copy(), dist.copy(), n_cells, eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
-                # Print the probability that the tree was sampled followed by the (nontrivial) subtrees
-                f.write(str(prob_sequence / correction) + " " + "".join(map(lambda x: str(int(x)), subtrees.flatten())) + "\n") # There is probably a better way to do this 
+            f.write(str(num_samples))
+            for ls in lines:
+                f.write("\n" + " ".join(ls))
     except FileExistsError:
         print("The path provided for the output file already exists.")
     
@@ -56,7 +62,8 @@ def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, di
     """
 
     subtrees, prior_prob, norm_factor = sample_rec(P, subtrees, dist, n_cells, 0, np.arange(n_cells, dtype=int), eps=eps, delta=delta, coef=coef, divide=divide, divide_factor=divide_factor, rng=rng)
-    return subtrees[n_cells:-1], prior_prob, norm_factor
+    return subtrees, prior_prob, norm_factor
+    #return subtrees[n_cells:-1], prior_prob, norm_factor # the [n_cells:-1] removes the trivial subtrees (singletons) at the beginning and the trivial subtrees (root) at the end
 
 def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, coef, divide, divide_factor, rng=None):
     """
@@ -137,6 +144,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
     return subtrees, prior_prob * prob.flat[ind], norm_factor * q_i
     
 if __name__ == "__main__":
+    #TODO Add checks to make sure inputted args make sense
     parser = argparse.ArgumentParser(description='run.py')
 
     parser.add_argument("-i", "--input_matrix", type=str,                                                        
