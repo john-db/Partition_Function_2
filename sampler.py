@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import pandas as pd
+import os
 
 def main(path, num_samples, alpha, beta, out_path, seed=None):
     df = pd.read_csv(path, sep="\t", index_col=[0])
@@ -39,13 +40,10 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
         # Stores the probability that the tree was sampled followed by the number of subtrees in the array, and then the subtrees linearized
         lines[i] = [str(prob_sequence / correction), str(subtrees.shape[0]), "".join(map(lambda x: str(int(x)), subtrees.flatten()))]
                 
-    try:
-        with open(out_path, "x") as f:
-            f.write(str(num_samples))
-            for ls in lines:
-                f.write("\n" + " ".join(ls))
-    except FileExistsError:
-        print("The path provided for the output file already exists.")
+    with open(out_path, "x") as f:
+        f.write(str(num_samples))
+        for ls in lines:
+            f.write("\n" + " ".join(ls))
     
 
 def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
@@ -193,4 +191,12 @@ if __name__ == "__main__":
 
 
     args = parser.parse_args()
+    if os.path.exists(args.output):
+        raise FileExistsError("There is already a file at the output path")
+    if args.alpha < 0 or args.alpha > 1:
+        raise Exception("False positive probability must be in the interval [0.0, 1.0]")
+    if args.beta < 0 or args.beta > 1:
+        raise Exception("False negative probability must be in the interval [0.0, 1.0]")
+    if args.num_samples < 1:
+        raise Exception("Number of samples must be a positive integer")
     main(args.input_matrix, args.num_samples, args.alpha, args.beta, args.output, args.seed)
