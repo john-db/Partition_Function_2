@@ -1,4 +1,4 @@
-Run commands from top directory
+Run commands from this directory
 
 Command to sample trees
 
