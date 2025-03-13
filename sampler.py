@@ -97,7 +97,7 @@ def sample_rec(P, subtrees, dist, n_cells, iter, current_indices, eps, delta, co
         prob *= -np.log(1 + eps)
     
     # Softmax
-    np.nan_to_num(prob, nan= -np.inf, copy=False)
+    np.nan_to_num(prob, nan= -np.inf, copy=False) # TODO: try removing this by replacing numpy functions with their nan friendly counterparts
     prob = np.exp(prob)
     prob *= 1 / np.sum(prob)
 
