@@ -4,40 +4,40 @@ import pandas as pd
 from IPython import embed
 import sys, time
 
-def log_pf_cond_mat_mul(P, subtrees, cells_vec, mut_id):
-    if any(np.equal(subtrees, cells_vec).all(1)):
-        P_minus_m = np.delete(P, mut_id, axis=1)
-        col = P[:, mut_id]
-        res = log_prob_mat_mul_calc(np.log2(P_minus_m), np.log2(1 - P_minus_m), subtrees)
-        return np.dot(np.log2(col), cells_vec) + np.dot(np.log2(1 - col), 1 - cells_vec) + res - log_prob_mat_mul_calc(np.log2(P), np.log2(1 - P), subtrees)
-    else:
-        return np.float64('-inf')
+# def log_pf_cond_mat_mul(P, subtrees, cells_vec, mut_id):
+#     if any(np.equal(subtrees, cells_vec).all(1)):
+#         P_minus_m = np.delete(P, mut_id, axis=1)
+#         col = P[:, mut_id]
+#         res = log_prob_mat_mul_calc(np.log2(P_minus_m), np.log2(1 - P_minus_m), subtrees)
+#         return np.dot(np.log2(col), cells_vec) + np.dot(np.log2(1 - col), 1 - cells_vec) + res - log_prob_mat_mul_calc(np.log2(P), np.log2(1 - P), subtrees)
+#     else:
+#         return np.float64('-inf')
 
-def log_pf_cond_on_one_tree(P, subtrees, cells_vec, cond_m):
-    r"""
-    Prob_{A\sim P}[\subtree(c, R, A)\cap A\in G| A\in T] in O(n^2).
+# def log_pf_cond_on_one_tree(P, subtrees, cells_vec, cond_m):
+#     """
+#     Prob_{A\sim P}[\subtree(c, R, A)\cap A\in G| A\in T] in O(n^2).
 
-    :param P:
-    :param subtrees: cell lineage tree  n x (2n+1)
-    :param cells_vec: set of cells
-    :param cond_m: one mutation
-    :return: log 2 of the probability conditioned on the given tree...
-    """
+#     :param P:
+#     :param subtrees: cell lineage tree  n x (2n+1)
+#     :param cells_vec: set of cells
+#     :param cond_m: one mutation
+#     :return: log 2 of the probability conditioned on the given tree...
+#     """
 
-    denominator = np.float64(0)
-    numerator = np.float64(0)
-    col = P[:, cond_m]
-    for v in subtrees:
-        prob = np.float64(np.prod(col * v + (1 - col) * (1 - v)))
-        denominator += prob
-        if np.array_equal(v, cells_vec):
-            numerator = prob
-    if numerator == 0:
-        return np.float64('-inf')
-    else:
-        return np.log2(numerator) - np.log2(denominator)
+#     denominator = np.float64(0)
+#     numerator = np.float64(0)
+#     col = P[:, cond_m]
+#     for v in subtrees:
+#         prob = np.float64(np.prod(col * v + (1 - col) * (1 - v)))
+#         denominator += prob
+#         if np.array_equal(v, cells_vec):
+#             numerator = prob
+#     if numerator == 0:
+#         return np.float64('-inf')
+#     else:
+#         return np.log2(numerator) - np.log2(denominator)
 
-def log_pf_cond_numpy(P, subtrees, cells_vec, mutation):
+def log_pf_cond_numpy(logP1, logP0, subtrees, cells_vec, mutation):
     r"""
     Prob_{A\sim P}[\subtree(c, R, A)\cap A\in G| A\in T] in O(n^2).
 
@@ -48,11 +48,12 @@ def log_pf_cond_numpy(P, subtrees, cells_vec, mutation):
     :return: log 2 of the probability conditioned on the given tree...
     """
     if any(np.equal(subtrees, cells_vec).all(1)):
-        col = P[:, mutation]
-        denominator = np.matmul(subtrees, np.log2(col)) + np.matmul(1 - subtrees, np.log2(1 - col))
+        col1 = logP1[:, mutation]
+        col0 = logP0[:, mutation]
+        denominator = np.matmul(subtrees, col1) + np.matmul(1 - subtrees, col0)
         denominator = np.exp2(denominator)
         denominator = np.sum(denominator)
-        return np.dot(np.log2(col), cells_vec) + np.dot(np.log2(1 - col), 1 - cells_vec) - np.log2(denominator)
+        return np.dot(col1, cells_vec) + np.dot(col0, 1 - cells_vec) - np.log2(denominator)
     else:
         return np.float64('-inf')
 

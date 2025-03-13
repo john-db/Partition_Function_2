@@ -2,7 +2,7 @@ import argparse, time
 import pandas as pd
 import numpy as np
 from decimal import Decimal
-from tree_scorer import log_prob_mat_mul_calc, log_pf_cond_mat_mul, log_pf_cond_numpy, log_pf_cond_on_one_tree
+from tree_scorer import log_prob_mat_mul_calc, log_pf_cond_numpy # log_pf_cond_mat_mul, log_pf_cond_on_one_tree
 from utilities.cf_mat_to_newick import sts_to_newick
 
 def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta):
@@ -42,15 +42,7 @@ def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
             cells_vec[cell_ids] = 1
             mut_id = list(df.columns).index(pairs[j][1])
 
-            # Below are three different ways of computing p2 (the numerator is the sum of p2 * p1 over all trees)
-            # The first (log_pf_cond_on_one_tree) is a slightly modified version of the way that p2 was computed for the RECOMB submission
-            # The second (log_pf_cond_mat_mul) computes p2 as a ratio between two values computed using
-            #           the function that computes p1 (log_prob_mat_mul_calc)
-            # The third (log_pf_cond_numpy) is a translation of the first into Numpy
-
-            #log_p2 = log_pf_cond_on_one_tree(P, tree, cells_vec, mut_id)
-            # log_p2 = log_pf_cond_mat_mul(P, tree, cells_vec, mut_id)
-            log_p2 = log_pf_cond_numpy(P, tree, cells_vec, mut_id)
+            log_p2 = log_pf_cond_numpy(logP1, logP0, tree, cells_vec, mut_id)
 
             numerators[j] += 2 ** Decimal(log_p1 + log_p2 - log_sampling_prob)
     
