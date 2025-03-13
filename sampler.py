@@ -1,9 +1,10 @@
+import argparse, os, time
 import numpy as np
-import argparse
 import pandas as pd
-import os
 
 def main(path, num_samples, alpha, beta, out_path, seed=None):
+    start = time.time()
+
     df = pd.read_csv(path, sep="\t", index_col=[0])
     rng = np.random.default_rng(seed=seed)
     eps=0.1
@@ -44,6 +45,8 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
         f.write(str(num_samples))
         for ls in lines:
             f.write("\n" + " ".join(ls))
+
+    print("Sampling finished in: " + str(start - time.time()))
     
 
 def draw_sample_bclt(P, subtrees, dist, n_cells, eps=0.1, delta=0.8, coef=10, divide=False, divide_factor=10, rng=None):
