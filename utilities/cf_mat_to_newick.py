@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-def sts_to_newick(subtrees):
+def sts_to_newick(subtrees, labels=None):
     subtrees = list(subtrees)
     n_cells = len(subtrees[0])
     subtrees.append(np.ones(n_cells, dtype=np.int8))
@@ -12,7 +12,10 @@ def sts_to_newick(subtrees):
     subtrees = [np.array(x) for x in {(tuple(e)) for e in subtrees} if (sum(x) > 1 and sum(x) < n_cells)]
     subtrees.sort(key=sum)
     
-    return subtrees_to_newick(subtrees, list(range(len(subtrees[0]))))
+    if labels is None:
+        return subtrees_to_newick(subtrees, list(range(len(subtrees[0]))))
+    else:
+        return subtrees_to_newick(subtrees, labels)
 
 def cf_to_newick(df):
     subtrees = list(df.values.transpose())

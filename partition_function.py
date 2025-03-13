@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from decimal import Decimal
 from tree_scorer import log_prob_mat_mul_calc, log_pf_cond_mat_mul, log_pf_cond_numpy, log_pf_cond_on_one_tree
+from utilities.cf_mat_to_newick import sts_to_newick
 
 def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta):
 
@@ -15,6 +16,8 @@ def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
     P = t1 + t2
     P[I_mtr == 3] = 0.5                          # if a 3 (N/A entry) is observed we assume that there is a 50% probability that the entry is a 1
 
+    best_tree = None
+    best_score = None
     for i in range(len(trees)):
         tree = trees[i]
         log_sampling_prob = log_sampling_probabilities[i]
@@ -27,6 +30,9 @@ def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
         # the denominator is the same for each tree clade/mutation pair with the given sample of trees,
         # so we only compute this once
         log_p1 = log_prob_mat_mul_calc(logP1, logP0, tree)
+        if best_score == None or log_p1 > best_score:
+            best_score = log_p1
+            best_tree = i
         denominator += 2 ** Decimal(log_p1 - log_sampling_prob)
 
         # for each clade/mutation pair to be evaluated, we compute its numerator
@@ -48,7 +54,7 @@ def compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
 
             numerators[j] += 2 ** Decimal(log_p1 + log_p2 - log_sampling_prob)
     
-    return numerators, denominator
+    return numerators, denominator, trees[i], best_score
 
 def read_trees(path_trees, num_cells):
     # The input file of trees contains on each line a sampling probability corresponding to a tree, 
@@ -94,7 +100,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, output, clade=None,
         pairs = [clade.split(','), mutation]
 
     trees, log_sampling_probabilities = read_trees(path_trees, df.shape[0])
-    numerators, denominator = compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
+    numerators, denominator, tree, score = compute_estimates(df, pairs, trees, log_sampling_probabilities, alpha, beta)
 
     # output partition function value for each clade,mutation pair, along with the inputted arguments
     try:
@@ -105,6 +111,7 @@ def partition_function(path_matrix, path_trees, alpha, beta, output, clade=None,
                 file.write("\n" + "\t".join(info))
     except FileExistsError:
         print("The path provided for the output file already exists.")
+    print(str(score) + " " + str(sts_to_newick(tree, df.index)))
     
 
 
