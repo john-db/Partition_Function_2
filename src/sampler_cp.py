@@ -68,11 +68,17 @@ def main(path, num_samples, alpha, beta, out_path, seed=None):
             #call recursive function
             subtrees, prob_sequence, correction = draw_sample_bclt_cp(P_stacked.copy(), init_subtrees_stacked.copy(), dist_stacked.copy(), n_cells)
 
+            embed()
+
+            for j in range(100):
+                temp = [str(prob_sequence[j] / correction[j]), str(subtrees.shape[0]), "".join(map(lambda x: str(int(x)), subtrees[:,:,j].flatten()))]
+                print((f" ".join(temp)))
+
             #write to parquet
             table = pa.Table.from_arrays([
                                             pa.array((prob_sequence/correction).get(), type=pa.float64()),                     #sampling prob
                                             pa.array(np.full(batch_size, subtrees.shape[0]), type=pa.int32()),                 #number of subtrees
-                                            pa.FixedSizeListArray.from_arrays(pa.array(subtrees.flatten().get()), bt_size)     #binary trees
+                                            pa.FixedSizeListArray.from_arrays(pa.array(subtrees.flatten().get()), bt_size)     #binary trees !!!!!!! BUGGGG USE RESHAPE TO MAKE SURE FORMAT STAYS  subtrees.reshape(-1, subtrees.shape[2])
                                         ], schema=schema)
             writer.write_table(table)
 

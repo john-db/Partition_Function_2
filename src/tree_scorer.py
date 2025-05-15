@@ -1,4 +1,5 @@
 import numpy as np
+import cupy as cp
 import pandas as pd
 #import treeswift as ts
 from IPython import embed
@@ -57,6 +58,91 @@ def log_pf_cond_numpy(logP1, logP0, subtrees, cells_vec, mutation):
     else:
         return np.float64('-inf')
 
+def log_pf_cond_numpy_cp(logP1, logP0, subtrees, cells_vec, mutation):
+    r"""
+    Prob_{A\sim P}[\subtree(c, R, A)\cap A\in G| A\in T] in O(n^2).
+
+    :param P:
+    :param subtrees: cell lineage tree  2n x n
+    :param cells_vec: set of cells
+    :param cond_m: one mutation
+    :return: log 2 of the probability conditioned on the given tree...
+    """
+    # If the clade (cells_vec) is in the subtrees, then we calculate the associated log probability
+    # Otherwise, the probability is zero (so log probability is -inf)
+    B, N, M = subtrees.shape
+
+    # (1, 1, M) shape to broadcast for comparison
+    cells_vec_broadcast = cells_vec[None, None, :]  # shape (1, 1, M)
+
+    # Compare each row of subtrees[b] to cells_vec → (B, N)
+    matches = cp.all(subtrees == cells_vec_broadcast, axis=2)  # shape (B, N)
+    any_match = cp.any(matches, axis=1)  # shape (B,)
+
+    # Extract col1 and col0, shape (M,)
+    col1 = logP1[:, mutation]
+    col0 = logP0[:, mutation]
+
+    # Reshape for broadcasting: (1, 1, M)
+    col1 = col1[None, None, :]
+    col0 = col0[None, None, :]
+
+    # Compute: log_sum = log2( sum(2^(st @ col1 + (1 - st) @ col0)) )
+    dot1 = cp.sum(subtrees * col1, axis=2)  # shape (B, N)
+    dot0 = cp.sum((1 - subtrees) * col0, axis=2)  # shape (B, N)
+    exponent = cp.exp2(dot1 + dot0)  # shape (B, N)
+    denom = cp.sum(exponent, axis=1)  # shape (B,)
+
+    # Numerator: single dot product with cells_vec
+    num = cp.dot(cells_vec, logP1[:, mutation]) + cp.dot(1 - cells_vec, logP0[:, mutation])  # scalar
+
+    # Result: broadcasted numerator minus log2(denominator)
+    result = cp.full((B,), -cp.inf, dtype=cp.float64)
+    result[any_match] = num - cp.log2(denom[any_match])
+
+    return result
+
+def log_prob_mat_mul_calc_cp(logP1, logP0, subtrees):
+    """
+    Parameters:
+        logP1: Matrix containing the log base 2 of the probability that the corresponding entry in the genotype matrix is 1
+            i.e. logP_i,j = log_2(Pr[X_i,j = 1])
+        logP0: Similar to above, but it is the log base 2 of probability that the corresponding entry in the genotype matrix is 0
+
+            Both of these matrices have dimension n rows (number of cells) by m columns (number of mutations)
+
+        subtrees: 2D-Numpy array where each row of the array/matrix corresponds to a subtree (1 indicates that leaf is present in the subtree, 0 else)
+            The dimension of this matrix varies depending on the tree, but it has as many rows as there are nodes of the tree,
+            and it has n (number of cells/leaves) columns
+
+            If the tree which the subtrees matrix is representing is binary, then it has n - 1 internal nodes,
+            and one extra "subtree" of all zeros,
+            in which case the dimension of the subtrees matrix would be
+            2n rows by n columns. if it is a nonbinary tree it will have fewer rows and the same number of columns.
+
+    Returns:
+        The log base 2 of the probability that a matrix drawn from the distribution of the ground truth (represented in logP1 and logP0)
+        is consistent with the tree represented by the subtrees matrix
+    """
+
+    # multiplies the [(less or equal to 2n) by n] matrix against the [n by m] matrix
+    # Afterwards, res_i,j = log_2 of the probability that the ith subtree is equal to the j^th mutation
+    # Now, we need to sum these mutation-wise (i.e. for each mutation, sum the probability that it equals the first mutations plus the second etc...)
+    # To sum probabilities, we will need to exponentiate res
+    # Now np.exp2(res)_i,j = probability that the ith subtree is equal to the j^th mutation
+    # res has dimensions (# of subtrees by # of mutations)
+    # np.matmul documentation: https://numpy.org/doc/2.1/reference/generated/numpy.matmul.html
+    #   "If the first argument is 1-D, it is promoted to a matrix by prepending a 1 to its dimensions.
+    #   After matrix multiplication the prepended 1 is removed."
+    res = cp.matmul(subtrees, logP1) + cp.matmul(1 - subtrees, logP0)
+
+    # Use sum instead of matmul with ones vector
+    res = cp.exp2(res).sum(axis=1)  # Sum along the correct axis
+    res = cp.log2(res).sum(axis=1)  # Log after summation
+
+    return res
+
+
 def log_prob_mat_mul_calc(logP1, logP0, subtrees):
     """
     Parameters:
@@ -90,7 +176,7 @@ def log_prob_mat_mul_calc(logP1, logP0, subtrees):
     # np.matmul documentation: https://numpy.org/doc/2.1/reference/generated/numpy.matmul.html
     #   "If the first argument is 1-D, it is promoted to a matrix by prepending a 1 to its dimensions.
     #   After matrix multiplication the prepended 1 is removed."
-    
+
     res = np.exp2(res).sum(axis=0)
     res = np.log2(res).sum()
 
@@ -98,6 +184,7 @@ def log_prob_mat_mul_calc(logP1, logP0, subtrees):
     # sys.exit()
 
     return res
+
 
 # def main():
 #     path_df = "./input_genotype_matrix"
