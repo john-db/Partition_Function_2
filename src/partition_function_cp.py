@@ -12,6 +12,8 @@ from IPython import embed
 from pathlib import Path
 import concurrent.futures
 
+batch_size = None
+
 def compute_estimates_orig(df, pairs, trees, log_sampling_probabilities, alpha, beta):
 
     # Here we create the matrix representing the probability distribution of the ground truth,
@@ -85,7 +87,6 @@ def compute_log_p1_cp(df, trees, log_sampling_probabilities, alpha, beta):
 
     #preallocate
     log_p1s = cp.empty(trees.shape[0])
-    batch_size = 1000
     best_tree = None
     best_score = None
     for start in range(0, trees.shape[0], batch_size):
@@ -288,6 +289,8 @@ if __name__ == "__main__":
                         help="False-positive rate (alpha in the paper)", required=True)
     parser.add_argument("-fn", "--beta", type=float,
                         help="False-negative rate (beta in the paper)", required=True)
+    parser.add_argument("-b", "--batch_size", type=int,
+                        help="batch size", required=True)
 
     #optional args
     parser.add_argument("-g", "--gpu",
@@ -302,6 +305,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     if args.scoring_matrix is not None:
+        batch_size = args.batch_size
         partition_function(args.input_matrix, args.trees, args.alpha, args.beta, args.output, path_scoring_matrix=args.scoring_matrix, gpu=args.gpu)
     else:
         pass # TODO implement this
