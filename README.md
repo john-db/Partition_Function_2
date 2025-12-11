@@ -1,5 +1,5 @@
 
-This implementation uses rlies on CuPy (<https://cupy.dev/>), which implements NumPy functions to run on CUDA. Make sure that CUDA has been loaded otherwise the programs will not run. On our compute cluster we must run:
+This implementation uses relies on CuPy (<https://cupy.dev/>), which implements NumPy to run on GPUs using CUDA. Make sure that CUDA has been loaded otherwise the programs will not run. On our compute cluster we must run:
 
 `module load CUDA/12.1`
 
@@ -13,4 +13,4 @@ Sampling trees:
 
 Computing estimates from the samples:
 
-`python ./src/partition_function_cp.py -i ./example/input_genotype_matrix.tsv -o ./partf_output.tsv -t ./samples -fp 0.001 -fn 0.1 -sm ./example/mutations_to_score_matrix.tsv`
+`python ./src/partition_function_cp.py -i ./example/input_genotype_matrix.tsv -o ./partf_output.tsv -t ./samples -fp 0.001 -fn 0.1 -b 100 -sm ./example/mutations_to_score_matrix.tsv`
