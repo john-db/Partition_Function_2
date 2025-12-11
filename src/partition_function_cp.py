@@ -103,7 +103,7 @@ def compute_log_p1_cp(df, trees, log_sampling_probabilities, alpha, beta):
     log_p1s_cpu = log_p1s.get()
 
     #preocess denominator computation in parallel
-    num_cpus=max(1, int(int(os.getenv('SLURM_CPUS_PER_TASK', 1)*0.75))
+    num_cpus=max(1, int(int(os.getenv('SLURM_CPUS_PER_TASK', 1)*0.75)))
 
     chunk_size = int(len(log_p1s) / num_cpus )+1
     print(f"Using {num_cpus} threads and a chunk size of {chunk_size}")
