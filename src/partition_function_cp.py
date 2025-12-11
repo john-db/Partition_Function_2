@@ -161,7 +161,7 @@ def compute_estimates(df, pairs, trees, log_p1s, log_sampling_probabilities, alp
             log_p2s[start:start+batch_size] = log_pf_cond_numpy_cp(logP1, logP0, tree_batch, cells_vec, mut_id)
 
         #preocess denominator computation in parallel
-        num_cpus=max(1, int(int(os.environ['SLURM_CPUS_PER_TASK'])*0.75))
+        num_cpus = max(1, int(int(os.getenv('SLURM_CPUS_PER_TASK', 1)) * 0.75))
 
         chunk_size = int(len(log_p2s) / num_cpus )+1
         print(f"Using {num_cpus} threads and a chunk size of {chunk_size}")
