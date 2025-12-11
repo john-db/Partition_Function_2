@@ -8,6 +8,7 @@ Here is an example of using the implementation to compute bipartition function e
 Sampling trees:
 
 `mkdir samples`
+
 `python ./src/sampler_cp.py -i ./example/input_genotype_matrix.tsv -n 500 -fp 0.001 -fn 0.1 -s 0 -b 100 -o ./samples/sample1.parquet`
 
 Computing estimates from the samples:
