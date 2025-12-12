@@ -164,7 +164,7 @@ def compute_estimates(df, pairs, trees, log_p1s, log_sampling_probabilities, alp
         num_cpus = max(1, int(int(os.getenv('SLURM_CPUS_PER_TASK', 1)) * 0.75))
 
         chunk_size = int(len(log_p2s) / num_cpus )+1
-        print(f"Using {num_cpus} threads and a chunk size of {chunk_size}")
+        #print(f"Using {num_cpus} threads and a chunk size of {chunk_size}")
 
         tasks = []
         with concurrent.futures.ProcessPoolExecutor(num_cpus) as executor:
