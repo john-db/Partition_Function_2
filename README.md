@@ -8,9 +8,14 @@ Here is an example of using the implementation to compute bipartition function e
 Sampling trees:
 
 `mkdir samples`
+We will tell the sampler to output our samples into the samples directory.
 
 `python ./src/sampler_cp.py -i ./example/input_genotype_matrix.tsv -n 500 -fp 0.001 -fn 0.1 -s 0 -b 100 -o ./samples/sample1.parquet`
 
-Computing estimates from the samples:
+We can collect additional samples by changing the random seed:
+
+`python ./src/sampler_cp.py -i ./example/input_genotype_matrix.tsv -n 500 -fp 0.001 -fn 0.1 -s 1 -b 100 -o ./samples/sample2.parquet`
+
+The implementation in `partition_function_cp.py` will read the samples from the parquet files in the samples directory and compute estimates based off of them:
 
 `python ./src/partition_function_cp.py -i ./example/input_genotype_matrix.tsv -o ./partf_output.tsv -t ./samples -fp 0.001 -fn 0.1 -b 100 -sm ./example/mutations_to_score_matrix.tsv`
